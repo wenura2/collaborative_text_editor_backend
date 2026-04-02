@@ -29,10 +29,7 @@ const io = new Server(server, {
   },
 });
 
-mongoose.connect("mongodb+srv://thilankawijesingham:NPZ8LSJkiYTXvfEq@cluster0.kmv2to4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0", {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
+mongoose.connect("mongodb+srv://thilankawijesingham:NPZ8LSJkiYTXvfEq@cluster0.kmv2to4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
 .then(() => console.log("✅ Connected to MongoDB"))
 .catch((err) => console.error("❌ MongoDB connection error:", err));
 
@@ -105,5 +102,20 @@ io.on("connection", (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+const BASE_PORT = Number(process.env.PORT) || 5000;
+
+const startServer = (port) => {
+  server
+    .listen(port, () => console.log(`Server running on port ${port}`))
+    .once("error", (error) => {
+      if (error.code === "EADDRINUSE") {
+        console.warn(`Port ${port} is in use, retrying on ${port + 1}...`);
+        startServer(port + 1);
+        return;
+      }
+      console.error("Server startup error:", error);
+      process.exit(1);
+    });
+};
+
+startServer(BASE_PORT);
