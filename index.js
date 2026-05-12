@@ -18,7 +18,19 @@ const FRONTEND_ORIGIN = process.env.FRONTEND_URL || "http://localhost:5173";
 const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://thilankawijesingham:NPZ8LSJkiYTXvfEq@cluster0.kmv2to4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
 
 console.log("🌐 CORS Origin:", FRONTEND_ORIGIN);
-console.log("🗄️  MongoDB URI:", MONGO_URI.split('@')[0] + '@...');
+if (MONGO_URI) {
+  try {
+    const masked = MONGO_URI.includes('@') ? MONGO_URI.split('@')[0] + '@...' : 'set';
+    console.log('🗄️  MongoDB URI:', masked);
+  } catch (e) {
+    console.log('🗄️  MongoDB URI: (unable to mask)');
+  }
+} else {
+  console.log('🗄️  MongoDB URI: not set');
+}
+
+// Health endpoint for Render and quick checks
+app.get('/_health', (req, res) => res.json({ ok: true, env: process.env.NODE_ENV || 'unknown' }));
 
 app.use(cors({ origin: FRONTEND_ORIGIN, credentials: true }));
 app.use(express.json());

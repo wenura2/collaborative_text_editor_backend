@@ -1,4 +1,4 @@
-const Project = require("../models/Project");
+const Project = require("../models/project");
 const ProjectModel = require("../models/projectModel");
 const User = require("../models/userModel");
 const { isValidObjectId } = require("mongoose");
