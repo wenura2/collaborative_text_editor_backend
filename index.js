@@ -125,20 +125,18 @@ const io = new Server(server, {
 });
 
 // ====== MONGODB CONNECTION ======
-mongoose.connect(MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-  serverSelectionTimeoutMS: 10000,
-  socketTimeoutMS: 45000,
-})
-.then(() => {
-  console.log("✅ MongoDB connected successfully");
-})
-.catch((err) => {
-  console.error("❌ MongoDB connection failed:", err.message);
-  console.error("⚠️  Backend will continue but database operations will fail");
-  // Don't exit - let the app start so Render health checks work
-});
+const connectToMongo = async () => {
+  try {
+    await mongoose.connect(MONGO_URI, {
+      serverSelectionTimeoutMS: 30000,
+      socketTimeoutMS: 45000,
+    });
+    console.log("✅ MongoDB connected successfully");
+  } catch (err) {
+    console.error("❌ MongoDB connection failed:", err.message);
+    process.exit(1);
+  }
+};
 
 // Handle MongoDB connection events
 mongoose.connection.on('disconnected', () => {
@@ -241,7 +239,12 @@ const startServer = (port) => {
     });
 };
 
-startServer(PORT);
+  const bootstrap = async () => {
+    await connectToMongo();
+    startServer(PORT);
+  };
+
+  bootstrap();
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
