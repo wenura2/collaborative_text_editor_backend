@@ -5,13 +5,23 @@ const exchangeGitHubCodeForToken = async (req, res) => {
   const { code } = req.body;
 
   try {
+    // Validate required environment variables
+    if (!process.env.GITHUB_CLIENT_ID || !process.env.GITHUB_CLIENT_SECRET) {
+      return res.status(500).json({ 
+        error: "GitHub OAuth not configured. Please set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET." 
+      });
+    }
+
+    const GITHUB_REDIRECT_URI = process.env.GITHUB_REDIRECT_URI || 
+      (process.env.FRONTEND_URL || "http://localhost:5173") + "/github-auth";
+
     const response = await axios.post(
       "https://github.com/login/oauth/access_token",
       {
-        client_id: "Ov23liTae4WNJqAamzvi",
-        client_secret: "2ab88bbc6d8bbb9ad13464edc3e5864db7c46dd4",
+        client_id: process.env.GITHUB_CLIENT_ID,
+        client_secret: process.env.GITHUB_CLIENT_SECRET,
         code: code,
-        redirect_uri: "http://localhost:5173/github-auth",
+        redirect_uri: GITHUB_REDIRECT_URI,
       },
       { headers: { Accept: "application/json" } }
     );

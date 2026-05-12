@@ -13,26 +13,86 @@ const gitRoutes = require('./routes/gitRoutes');
 const app = express();
 const server = http.createServer(app);
 
-// Environment-based CORS configuration
-const FRONTEND_ORIGIN = process.env.FRONTEND_URL || "http://localhost:5173";
-const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://thilankawijesingham:NPZ8LSJkiYTXvfEq@cluster0.kmv2to4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
+// ====== ENVIRONMENT VARIABLE VALIDATION ======
+// Check for required environment variables
+const requiredEnvVars = ['MONGO_URI', 'ACCESS_TOKEN_SECRET_KEY', 'REFRESH_TOKEN_SECRET_KEY'];
+const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
-console.log("🌐 CORS Origin:", FRONTEND_ORIGIN);
+if (missingEnvVars.length > 0) {
+  console.error(`\n❌ STARTUP ERROR: Missing required environment variables:`);
+  missingEnvVars.forEach(varName => console.error(`   - ${varName}`));
+  console.error(`\n📋 Please set these variables in your environment or .env file\n`);
+  process.exit(1);
+}
+
+console.log('✅ All required environment variables are set');
+
+// Environment-based CORS configuration - Support multiple frontend ports
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+const NODE_ENV = process.env.NODE_ENV || "development";
+const MONGO_URI = process.env.MONGO_URI;
+
+// Build CORS allowed origins based on environment
+let ALLOWED_ORIGINS = [FRONTEND_URL];
+
+if (NODE_ENV === "development") {
+  // Add local development URLs in dev mode
+  ALLOWED_ORIGINS = [
+    FRONTEND_URL,
+    "http://localhost:5173",
+    "http://localhost:5174", 
+    "http://localhost:5175",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "http://127.0.0.1:5175"
+  ];
+}
+
+console.log(`🌐 Environment: ${NODE_ENV}`);
+console.log(`🌐 CORS Allowed Origins: ${ALLOWED_ORIGINS.length} origin(s)`);
+console.log(`🌐 Primary Frontend URL: ${FRONTEND_URL}`);
 if (MONGO_URI) {
   try {
     const masked = MONGO_URI.includes('@') ? MONGO_URI.split('@')[0] + '@...' : 'set';
-    console.log('🗄️  MongoDB URI:', masked);
+    console.log(`🗄️  MongoDB URI: ${masked}`);
   } catch (e) {
     console.log('🗄️  MongoDB URI: (unable to mask)');
   }
-} else {
-  console.log('🗄️  MongoDB URI: not set');
 }
 
-// Health endpoint for Render and quick checks
-app.get('/_health', (req, res) => res.json({ ok: true, env: process.env.NODE_ENV || 'unknown' }));
+// ====== HEALTH CHECK ENDPOINT FOR RENDER ======
+app.get('/_health', (req, res) => {
+  res.status(200).json({ 
+    status: 'ok',
+    environment: NODE_ENV,
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    timestamp: new Date().toISOString()
+  });
+})
 
-app.use(cors({ origin: FRONTEND_ORIGIN, credentials: true }));
+// ====== PRODUCTION-READY CORS CONFIGURATION ======
+app.use(cors({ 
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true);
+    } else if (NODE_ENV === "development") {
+      // Allow all origins in development
+      callback(null, true);
+    } else {
+      console.warn(`[CORS] Rejected origin: ${origin}`);
+      callback(new Error('CORS not allowed'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  maxAge: 3600 // 1 hour
+}));
+
 app.use(express.json());
 
 app.use("/api/auth", userRoutes);
@@ -40,18 +100,41 @@ app.use("/api/project", projectRoutes);
 app.use('/api/github', githubRoutes);
 app.use('/api/git', gitRoutes);
 
-// Socket.io configuration with proper CORS
+// ====== SOCKET.IO CONFIGURATION FOR RENDER ======
 const io = new Server(server, {
   cors: { 
-    origin: FRONTEND_ORIGIN,
+    origin: NODE_ENV === "production" ? ALLOWED_ORIGINS : true,
     methods: ["GET", "POST"],
-    credentials: true
+    credentials: true,
+    maxAge: 3600
   },
+  transports: ['websocket', 'polling']
 });
 
-mongoose.connect(MONGO_URI)
-.then(() => console.log("✅ Connected to MongoDB"))
-.catch((err) => console.error("❌ MongoDB connection error:", err));
+// ====== MONGODB CONNECTION ======
+mongoose.connect(MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 10000,
+  socketTimeoutMS: 45000,
+})
+.then(() => {
+  console.log("✅ MongoDB connected successfully");
+})
+.catch((err) => {
+  console.error("❌ MongoDB connection failed:", err.message);
+  console.error("⚠️  Backend will continue but database operations will fail");
+  // Don't exit - let the app start so Render health checks work
+});
+
+// Handle MongoDB connection events
+mongoose.connection.on('disconnected', () => {
+  console.warn("⚠️  MongoDB disconnected");
+});
+
+mongoose.connection.on('error', (err) => {
+  console.error("❌ MongoDB error:", err.message);
+});
 
 // Track connected users
 const userSocketMap = {};
@@ -122,20 +205,39 @@ io.on("connection", (socket) => {
   });
 });
 
-const BASE_PORT = Number(process.env.PORT) || 5000;
+// ====== SERVER STARTUP ======
+const PORT = process.env.PORT || 5000;
 
 const startServer = (port) => {
   server
-    .listen(port, () => console.log(`Server running on port ${port}`))
+    .listen(port, "0.0.0.0", () => {
+      console.log(`\n${'='.repeat(50)}`);
+      console.log(`🚀 Server is running on port ${port}`);
+      console.log(`📍 Environment: ${NODE_ENV}`);
+      console.log(`🔗 Frontend URL: ${FRONTEND_URL}`);
+      console.log(`${'='.repeat(50)}\n`);
+    })
     .once("error", (error) => {
       if (error.code === "EADDRINUSE") {
-        console.warn(`Port ${port} is in use, retrying on ${port + 1}...`);
+        console.warn(`⚠️  Port ${port} is already in use, trying port ${port + 1}...`);
         startServer(port + 1);
         return;
       }
-      console.error("Server startup error:", error);
+      console.error("❌ Server startup error:", error);
       process.exit(1);
     });
 };
 
-startServer(BASE_PORT);
+startServer(PORT);
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('\n📭 SIGTERM received, shutting down gracefully...');
+  server.close(() => {
+    console.log('✅ Server closed');
+    mongoose.connection.close(false, () => {
+      console.log('✅ MongoDB connection closed');
+      process.exit(0);
+    });
+  });
+});
