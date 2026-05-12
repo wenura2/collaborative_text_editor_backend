@@ -137,7 +137,7 @@ const connectToMongo = async () => {
     console.log("✅ MongoDB connected successfully");
   } catch (err) {
     console.error("❌ MongoDB connection failed:", err.message);
-    process.exit(1);
+    console.error("⚠️  Starting server without a live MongoDB connection so Render stays up.");
   }
 };
 
