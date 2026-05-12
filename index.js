@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const http = require("http");
@@ -12,7 +13,14 @@ const gitRoutes = require('./routes/gitRoutes');
 const app = express();
 const server = http.createServer(app);
 
-app.use(cors({ origin: "http://localhost:5173", credentials: true }));
+// Environment-based CORS configuration
+const FRONTEND_ORIGIN = process.env.FRONTEND_URL || "http://localhost:5173";
+const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://thilankawijesingham:NPZ8LSJkiYTXvfEq@cluster0.kmv2to4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
+
+console.log("🌐 CORS Origin:", FRONTEND_ORIGIN);
+console.log("🗄️  MongoDB URI:", MONGO_URI.split('@')[0] + '@...');
+
+app.use(cors({ origin: FRONTEND_ORIGIN, credentials: true }));
 app.use(express.json());
 
 app.use("/api/auth", userRoutes);
@@ -23,13 +31,13 @@ app.use('/api/git', gitRoutes);
 // Socket.io configuration with proper CORS
 const io = new Server(server, {
   cors: { 
-    origin: "http://localhost:5173",
+    origin: FRONTEND_ORIGIN,
     methods: ["GET", "POST"],
     credentials: true
   },
 });
 
-mongoose.connect("mongodb+srv://thilankawijesingham:NPZ8LSJkiYTXvfEq@cluster0.kmv2to4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+mongoose.connect(MONGO_URI)
 .then(() => console.log("✅ Connected to MongoDB"))
 .catch((err) => console.error("❌ MongoDB connection error:", err));
 

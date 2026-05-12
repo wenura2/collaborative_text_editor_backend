@@ -205,6 +205,13 @@ module.exports = {
           .json({ success: false, message: "Project name is required" });
       }
 
+      if (!userId) {
+        console.error("userId is undefined in createProject");
+        return res
+          .status(401)
+          .json({ success: false, message: "User authentication failed. Please log in again." });
+      }
+
       const projectId = Date.now().toString();
       const secretCode = generateSecretCode();
 
@@ -232,7 +239,13 @@ module.exports = {
       });
     } catch (error) {
       console.error("Error creating project:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      if (error.code === 11000) {
+        return res.status(409).json({ success: false, message: "Project with this name or code already exists" });
+      }
+      if (error.message && error.message.includes("validation")) {
+        return res.status(400).json({ success: false, message: `Validation error: ${error.message}` });
+      }
+      res.status(500).json({ success: false, message: `Server error: ${error.message}` });
     }
   },
 
