@@ -32,6 +32,21 @@ const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 const NODE_ENV = process.env.NODE_ENV || "development";
 const MONGO_URI = process.env.MONGO_URI;
 
+const isAllowedOrigin = (origin) => {
+  if (!origin) {
+    return true;
+  }
+
+  if (origin === FRONTEND_URL) {
+    return true;
+  }
+
+  return (
+    origin.endsWith(".netlify.app") ||
+    origin.endsWith(".netlify.com")
+  );
+};
+
 // Build CORS allowed origins based on environment
 let ALLOWED_ORIGINS = [FRONTEND_URL];
 
@@ -75,11 +90,9 @@ app.get('/_health', (req, res) => {
 app.use(cors({ 
   origin: function(origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
+    if (isAllowedOrigin(origin)) return callback(null, true);
     
-    if (ALLOWED_ORIGINS.includes(origin)) {
-      callback(null, true);
-    } else if (NODE_ENV === "development") {
+    if (NODE_ENV === "development") {
       // Allow all origins in development
       callback(null, true);
     } else {
@@ -103,7 +116,7 @@ app.use('/api/git', gitRoutes);
 // ====== SOCKET.IO CONFIGURATION FOR RENDER ======
 const io = new Server(server, {
   cors: { 
-    origin: NODE_ENV === "production" ? ALLOWED_ORIGINS : true,
+    origin: NODE_ENV === "production" ? isAllowedOrigin : true,
     methods: ["GET", "POST"],
     credentials: true,
     maxAge: 3600
