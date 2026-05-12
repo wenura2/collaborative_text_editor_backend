@@ -13,6 +13,9 @@ const gitRoutes = require('./routes/gitRoutes');
 const app = express();
 const server = http.createServer(app);
 
+mongoose.set('bufferCommands', false);
+mongoose.set('bufferTimeoutMS', 0);
+
 // ====== ENVIRONMENT VARIABLE VALIDATION ======
 // Check for required environment variables
 const requiredEnvVars = ['MONGO_URI', 'ACCESS_TOKEN_SECRET_KEY', 'REFRESH_TOKEN_SECRET_KEY'];
