@@ -31,9 +31,11 @@ if (missingEnvVars.length > 0) {
 console.log('✅ All required environment variables are set');
 
 // Environment-based CORS configuration - Support multiple frontend ports
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
-const NODE_ENV = process.env.NODE_ENV || "development";
-const MONGO_URI = process.env.MONGO_URI;
+const normalizeEnvValue = (value) => (value || '').trim().replace(/^['\"]|['\"]$/g, '');
+
+const FRONTEND_URL = normalizeEnvValue(process.env.FRONTEND_URL) || "http://localhost:5173";
+const NODE_ENV = (process.env.NODE_ENV || "development").trim();
+const MONGO_URI = normalizeEnvValue(process.env.MONGO_URI);
 
 const isAllowedOrigin = (origin) => {
   if (!origin) {
