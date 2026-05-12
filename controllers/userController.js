@@ -13,14 +13,6 @@ const normalizeEmail = (email) => (email || '').trim().toLowerCase();
 module.exports.Signup = async (req, res) => {
 
   try {
-
-    if (!isDatabaseReady()) {
-      return res.status(503).json({
-        message: "Database is not connected. Check MONGO_URI and MongoDB Atlas network access.",
-        success: false
-      });
-    }
-
     const { email, password } = req.body;
     const normalizedEmail = normalizeEmail(email);
 
@@ -82,14 +74,6 @@ module.exports.Signup = async (req, res) => {
 module.exports.Login = async (req, res) => {
 
   try {
-
-    if (!isDatabaseReady()) {
-      return res.status(503).json({
-        message: "Database is not connected. Check MONGO_URI and MongoDB Atlas network access.",
-        success: false
-      });
-    }
-
     const { loginemail, loginpassword } = req.body;
     const normalizedEmail = normalizeEmail(loginemail);
 
